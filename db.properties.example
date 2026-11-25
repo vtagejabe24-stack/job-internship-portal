@@ -1,0 +1,5 @@
+host=localhost
+port=3306
+database=internship_portal
+user=root
+password=your_mysql_password

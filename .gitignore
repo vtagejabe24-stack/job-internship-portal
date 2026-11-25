@@ -1,0 +1,12 @@
+# local database password - never commit
+db.properties
+
+# compiled classes
+out/
+
+# uploaded resumes (personal data)
+uploads/
+/*.pdf
+
+# Word lock files
+~$*
