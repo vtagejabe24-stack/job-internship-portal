@@ -454,6 +454,7 @@ public class WebApp {
             if (u == null) { redirect(r, "/login", "Wrong email or password."); return; }
             if (u.getStatus().equals("PENDING")) { redirect(r, "/login", "Your account is awaiting admin verification."); return; }
             if (u.getStatus().equals("BLOCKED")) { redirect(r, "/login", "Your account has been blocked."); return; }
+            dao.cancelResetRequest(u.getId());
             byte[] t = new byte[24];
             random.nextBytes(t);
             String sid = Base64.getUrlEncoder().withoutPadding().encodeToString(t);

@@ -239,10 +239,6 @@ public class PortalDao {
             ps.setString(1, email.toLowerCase());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next() && Auth.verify(pass, rs.getString("password_hash"))) {
-                    // they remembered their password after all, so any reset request is no longer needed
-                    if (rs.getTimestamp("reset_requested") != null) {
-                        run("UPDATE users SET reset_requested=NULL WHERE user_id=?", rs.getInt("user_id"));
-                    }
                     return new User(rs.getInt("user_id"), rs.getString("name"), rs.getString("email"),
                             rs.getString("role"), rs.getString("status"));
                 }
@@ -452,6 +448,11 @@ public class PortalDao {
         } catch (SQLException e) {
             System.out.println("Error: " + e.getMessage());
         }
+    }
+
+    /** Called after a normal login: the user remembered their password, so any reset request is no longer needed. */
+    public void cancelResetRequest(int userId) {
+        run("UPDATE users SET reset_requested=NULL WHERE user_id=? AND reset_requested IS NOT NULL", userId);
     }
 
     /** @return rows of {userId, name, email, role, requested at} for users waiting for a password reset. */
