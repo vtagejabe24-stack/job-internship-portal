@@ -11,7 +11,8 @@ CREATE TABLE users (
   password_hash VARCHAR(255) NOT NULL,                 -- salted SHA-256, never plain text
   role          ENUM('STUDENT','RECRUITER','ADMIN') NOT NULL,
   status        ENUM('ACTIVE','PENDING','BLOCKED') NOT NULL DEFAULT 'ACTIVE',
-  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  reset_requested TIMESTAMP NULL                       -- set by "Forgot password?", cleared when the admin resets it
 );
 
 CREATE TABLE student_profiles (

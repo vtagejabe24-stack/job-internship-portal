@@ -39,7 +39,8 @@ A console version of the same app is available with `java -cp "out;lib\*" Main`.
 - **Admins:** approve/block users, verify companies, review reported postings (risk level; remove / warn / keep),
   manage postings, dashboard stats.
 - **Everyone:** change your own password (click your name in the header). There is no email, so a forgotten password is
-  reset by an administrator, who sets a temporary one from the admin page.
+  handled by request: click "Forgot password?" on the login page, and the request appears on the admin dashboard,
+  where the admin sets a temporary password.
 - **Student extras:** withdraw an application (the record is kept, and you can apply again later).
 - **Recruiter extras:** edit a posting (applicants are notified of what changed), close and reopen postings.
 - **Matching:** skill-based - the share of a posting's required skills that appear in the student's skill list.

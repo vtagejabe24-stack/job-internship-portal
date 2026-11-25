@@ -139,6 +139,8 @@ public class PortalDao {
             tryAlter(s, "ALTER TABLE interviews ADD INDEX idx_iv_app (application_id)");
             tryAlter(s, "ALTER TABLE interviews DROP INDEX application_id");
             tryAlter(s, "ALTER TABLE companies ADD COLUMN verified BOOLEAN NOT NULL DEFAULT FALSE");
+            // set when a user asks for a password reset; cleared when the admin resets it
+            tryAlter(s, "ALTER TABLE users ADD COLUMN reset_requested TIMESTAMP NULL");
             tryAlter(s, "ALTER TABLE postings ADD COLUMN work_mode ENUM('ONSITE','REMOTE','HYBRID') "
                     + "NOT NULL DEFAULT 'ONSITE' AFTER location");
             s.execute("ALTER TABLE applications MODIFY status ENUM(" + APP_STATUSES + ") NOT NULL DEFAULT 'APPLIED'");
@@ -237,6 +239,10 @@ public class PortalDao {
             ps.setString(1, email.toLowerCase());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next() && Auth.verify(pass, rs.getString("password_hash"))) {
+                    // they remembered their password after all, so any reset request is no longer needed
+                    if (rs.getTimestamp("reset_requested") != null) {
+                        run("UPDATE users SET reset_requested=NULL WHERE user_id=?", rs.getInt("user_id"));
+                    }
                     return new User(rs.getInt("user_id"), rs.getString("name"), rs.getString("email"),
                             rs.getString("role"), rs.getString("status"));
                 }
@@ -425,16 +431,52 @@ public class PortalDao {
             return "Error: " + e.getMessage();
         }
         if (stored == null || !Auth.verify(oldPass, stored)) return "Your current password is wrong.";
-        run("UPDATE users SET password_hash=? WHERE user_id=?", Auth.hash(newPass), userId);
+        run("UPDATE users SET password_hash=?, reset_requested=NULL WHERE user_id=?", Auth.hash(newPass), userId);
         return "Password changed.";
     }
 
-    /** Admin sets a temporary password for a user who forgot theirs (admins change their own via changePassword). */
+    /**
+     * A user who forgot their password asks for a reset. Marks the account and notifies the admins.
+     * Unknown emails and admin accounts are ignored silently, so the page never reveals which emails exist.
+     */
+    public void requestPasswordReset(String email) {
+        int rows = run("UPDATE users SET reset_requested=NOW() WHERE email=? AND role <> 'ADMIN' "
+                + "AND reset_requested IS NULL", email.toLowerCase());
+        if (rows == 0) return;   // unknown email, admin, or already requested
+        String sql = "SELECT user_id FROM users WHERE role='ADMIN'";
+        try (Connection c = connect(); PreparedStatement ps = c.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                notifyUser(rs.getInt(1), "Password reset requested by " + email.toLowerCase()
+                        + ". Set a temporary password from the Admin Dashboard.");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    /** @return rows of {userId, name, email, role, requested at} for users waiting for a password reset. */
+    public List<String[]> listResetRequests() {
+        List<String[]> out = new ArrayList<>();
+        String sql = "SELECT user_id, name, email, role, reset_requested FROM users "
+                + "WHERE reset_requested IS NOT NULL ORDER BY reset_requested";
+        try (Connection c = connect(); PreparedStatement ps = c.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                out.add(new String[]{rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)});
+            }
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+        return out;
+    }
+
+    /** Admin sets a temporary password for a user who asked for a reset, and clears the request. */
     public String resetPassword(int userId, String newPass) {
         if (newPass.length() < 6) return "The password must be at least 6 characters.";
-        int rows = run("UPDATE users SET password_hash=? WHERE user_id=? AND role <> 'ADMIN'", Auth.hash(newPass), userId);
+        int rows = run("UPDATE users SET password_hash=?, reset_requested=NULL "
+                + "WHERE user_id=? AND role <> 'ADMIN' AND reset_requested IS NOT NULL", Auth.hash(newPass), userId);
         if (rows > 0) notifyUser(userId, "An administrator reset your password. Please change it after you log in.");
-        return rows > 0 ? "Password reset for user " + userId + "." : "No such (non-admin) user.";
+        return rows > 0 ? "Temporary password set. Give it to the user; they should change it after logging in."
+                : "That user has not asked for a password reset.";
     }
 
     public List<Application> applicationsOfStudent(int studentId) {

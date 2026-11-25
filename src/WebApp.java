@@ -167,6 +167,7 @@ public class WebApp {
                 case "/withdraw" -> withdraw(r);
                 case "/password" -> changePassword(r);
                 case "/admin/password" -> adminResetPassword(r);
+                case "/forgot" -> forgotPassword(r);
                 case "/applicants" -> applicants(r);
                 case "/candidate" -> candidate(r);
                 case "/status" -> updateStatus(r);
@@ -267,15 +268,20 @@ public class WebApp {
             .offer{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px}
             details{margin-top:4px}summary{cursor:pointer;color:#2563eb}
             @media(max-width:700px){table{display:block;overflow-x:auto}}
+            .hero{max-width:440px;margin:72px auto;padding:36px 32px;text-align:center}.hero h1{font-size:1.7rem;margin-bottom:10px}
+            .hero p{color:#4b5563;margin:0}.hero .small{font-size:.88rem;margin-top:22px}
+            .choices{display:flex;flex-direction:column;gap:10px;margin-top:24px}.choices .btn{padding:11px;font-weight:600}
+            .btn.alt{background:#fff;color:#1d4ed8;border:1px solid #2563eb}.btn.alt:hover{background:#eff6ff}
             """;
 
     private static String layout(Req r, String title, String body) {
         StringBuilder nav = new StringBuilder();
-        nav.append("<a href='/jobs'>Browse Openings</a>");
         String right;
         if (r.user != null) {
             switch (r.user.getRole()) {
-                case "STUDENT" -> nav.append("<a href='/applications'>My Applications</a><a href='/profile'>My Profile</a>");
+                // only students browse openings; recruiters manage their own postings and the admin has All Postings
+                case "STUDENT" -> nav.append("<a href='/jobs'>Browse Openings</a>"
+                        + "<a href='/applications'>My Applications</a><a href='/profile'>My Profile</a>");
                 case "RECRUITER" -> nav.append("<a href='/postings'>Dashboard</a><a href='/post'>Post Opening</a>"
                         + "<a href='/applicants'>Applicants</a><a href='/company/edit'>Company Profile</a>");
                 default -> nav.append("<a href='/admin'>Dashboard</a><a href='/admin/postings'>All Postings</a>"
@@ -286,12 +292,13 @@ public class WebApp {
                     + "<a href='/password' title='Change password'>" + esc(r.user.getName()) + " (" + r.user.getRole().toLowerCase() + ")</a>"
                     + "<form class='d' method='post' action='/logout'><button class='red'>Logout</button></form>";
         } else {
-            right = "<a href='/login'>Login</a><a href='/register'>Register</a>";
+            right = "<a href='/jobs'>Browse Openings</a><a href='/login'>Login</a><a href='/register'>Register</a>";
         }
         String msg = r.get("msg");
         return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
                 + "<title>" + esc(title) + " - Job &amp; Internship Portal</title><style>" + CSS + "</style></head><body>"
-                + "<header><a class='brand' href='/'>Job &amp; Internship Portal</a><nav>" + nav + "</nav><span class='sp'></span>"
+                + "<header><a class='brand' href='/'>Job &amp; Internship Portal</a>"
+                + (nav.isEmpty() ? "" : "<nav>" + nav + "</nav>") + "<span class='sp'></span>"
                 + "<div class='right'>" + right + "</div></header>"
                 + "<main>" + (msg.isEmpty() ? "" : "<div class='msg'>" + esc(msg) + "</div>") + body + "</main></body></html>";
     }
@@ -432,11 +439,12 @@ public class WebApp {
             }
             return;
         }
-        String body = "<div class='card'><h1>Find your next job or internship</h1>"
-                + "<p>Students get skill-match scores and recommendations, recruiters rank applicants and run interviews "
-                + "through to offers, and admins keep the platform safe.</p>"
-                + "<a class='btn' href='/register'>Create an account</a> <a class='btn' href='/login'>Login</a></div>"
-                + "<div class='card'><h2>Latest openings</h2>" + postingsTable(dao.searchPostings("", null), r, false) + "</div>";
+        // logged-out home: just a welcome and the choice to log in or sign up
+        String body = "<div class='card hero'><h1>Job &amp; Internship Portal</h1>"
+                + "<p>Log in or create an account to find openings, apply and track your applications.</p>"
+                + "<div class='choices'><a class='btn' href='/login'>Log in</a>"
+                + "<a class='btn alt' href='/register'>Sign up</a></div>"
+                + "<p class='small'>Just looking? <a href='/jobs'>Browse openings</a> without an account.</p></div>";
         send(r, 200, layout(r, "Home", body));
     }
 
@@ -458,8 +466,26 @@ public class WebApp {
                 + "<label>Email</label><input name='email' type='email' required>"
                 + "<label>Password</label><input name='password' type='password' required><br><br>"
                 + "<button>Login</button></form><p>No account? <a href='/register'>Register</a></p>"
-                + "<p><small>Forgot your password? Ask an administrator to reset it for you.</small></p></div>";
+                + "<p><small><a href='/forgot'>Forgot password?</a></small></p></div>";
         send(r, 200, layout(r, "Login", body));
+    }
+
+    /** There is no email system, so a forgotten password is a request that the admin handles. */
+    private static void forgotPassword(Req r) throws IOException {
+        if (r.post()) {
+            String email = r.get("email");
+            if (email.isEmpty()) { redirect(r, "/forgot", "Enter your email."); return; }
+            dao.requestPasswordReset(email);
+            // same answer whether or not the email exists, so this page cannot be used to find accounts
+            redirect(r, "/login", "Request sent. If that email has an account, the administrator will set a temporary "
+                    + "password and give it to you. Change it after you log in.");
+            return;
+        }
+        String body = "<div class='card' style='max-width:420px;margin:auto'><h1>Forgot password</h1>"
+                + "<p>Enter the email you registered with. The administrator will set a temporary password for you.</p>"
+                + "<form method='post'><label>Email</label><input name='email' type='email' required><br><br>"
+                + "<button>Request reset</button></form><p><a href='/login'>Back to login</a></p></div>";
+        send(r, 200, layout(r, "Forgot password", body));
     }
 
     private static void register(Req r) throws IOException {
@@ -1252,6 +1278,20 @@ public class WebApp {
         StringBuilder sb = new StringBuilder("<div class='card'><h1>Admin Dashboard</h1><p>")
                 .append(esc(dao.stats())).append("</p><p><a class='btn' href='/admin/reports'>Review reported postings (")
                 .append(dao.openReportCount()).append(" open)</a></p></div>");
+        List<String[]> resets = dao.listResetRequests();
+        if (!resets.isEmpty()) {
+            sb.append("<div class='card'><h2>Password reset requests</h2><p><small>These users forgot their password. "
+                    + "Set a temporary password and give it to them; they can change it after logging in.</small></p>"
+                    + "<table><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Requested</th><th></th></tr>");
+            for (String[] u : resets) {
+                sb.append("<tr><td>").append(u[0]).append("</td><td>").append(esc(u[1])).append("</td><td>")
+                        .append(esc(u[2])).append("</td><td>").append(u[3]).append("</td><td>").append(esc(fmtStamp(u[4])))
+                        .append("</td><td><form class='d inline' method='post' action='/admin/password'>").append(hidden("id", u[0]))
+                        .append("<input name='pw' type='text' placeholder='Temporary password (min 6)' minlength='6' required "
+                                + "style='width:210px'> <button>Set password</button></form></td></tr>");
+            }
+            sb.append("</table></div>");
+        }
         sb.append("<div class='card'><h2>Awaiting approval</h2><p><small>Approving a recruiter also verifies their company, "
                         + "which lets them post openings.</small></p>")
                 .append(userTable(dao.listUsers("PENDING"))).append("</div>");
@@ -1285,10 +1325,7 @@ public class WebApp {
                     .append(u.getStatus()).append("</td><td>");
             if (!u.getRole().equals("ADMIN")) {
                 sb.append(statusForm(u.getId(), "ACTIVE", "Approve", "green"))
-                        .append(statusForm(u.getId(), "BLOCKED", "Block", "red"))
-                        .append("<form class='d inline' method='post' action='/admin/password'>").append(hidden("id", u.getId()))
-                        .append("<input name='pw' placeholder='New password' minlength='6' required style='width:120px'> ")
-                        .append("<button class='grey'>Reset password</button></form>");
+                        .append(statusForm(u.getId(), "BLOCKED", "Block", "red"));
             }
             sb.append("</td></tr>");
         }
