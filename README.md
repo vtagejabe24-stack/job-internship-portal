@@ -18,6 +18,13 @@ Open http://localhost:8080 . Stop with Ctrl+C.
 
 A console version of the same app is available with `java -cp "out;lib\*" Main`.
 
+## Tests
+```
+java -cp "out;lib\*" Tests
+```
+Runs 23 automated checks of skill matching, password hashing, the offer-letter PDF and status names, and prints PASS or
+FAIL for each. They do not need the database.
+
 ## Demo logins (after running SeedData)
 | Role | Email | Password |
 |---|---|---|
@@ -54,4 +61,5 @@ A console version of the same app is available with `java -cp "out;lib\*" Main`.
 - `src/User.java`, `Internship.java`, `Application.java` - model classes
 - `src/Main.java` - console version
 - `src/SeedData.java` - demo data
+- `src/Tests.java` - automated unit tests
 - `sql/schema.sql` - database schema (9 tables)
