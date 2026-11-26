@@ -291,6 +291,8 @@ public class WebApp {
             right = "<a href='/notifications'>Notifications" + (unread > 0 ? " (" + unread + ")" : "") + "</a>"
                     + "<a href='/password' title='Change password'>" + esc(r.user.getName()) + " (" + r.user.getRole().toLowerCase() + ")</a>"
                     + "<form class='d' method='post' action='/logout'><button class='red'>Logout</button></form>";
+        } else if (r.ex.getRequestURI().getPath().equals("/")) {
+            right = "";   // the home page already shows big Log in / Sign up buttons
         } else {
             right = "<a href='/jobs'>Browse Openings</a><a href='/login'>Login</a><a href='/register'>Register</a>";
         }
