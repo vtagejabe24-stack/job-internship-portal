@@ -2,6 +2,10 @@
 
 A web application where students browse and apply to jobs and internships, recruiters post openings and manage applicants, and an admin approves recruiters and moderates the site. Built with plain Java (built-in HTTP server) and JDBC + MySQL.
 
+## Project report
+- [Read the report (PDF)](Job%20Internship%20Portal%20-%20Mini%20Project%20Report.pdf)
+- [Download the report (Word)](Job%20Internship%20Portal%20-%20Mini%20Project%20Report.docx)
+
 ## Setup
 1. Install MySQL Server and start it.
 2. Download MySQL Connector/J and put the jar in `lib/` (already included if you cloned this folder).
